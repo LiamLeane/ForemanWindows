@@ -1,0 +1,22 @@
+#!ipxe
+<%#
+kind: iPXE
+name: Windows iPXE
+oses:
+- Windows Server 2012
+- Windows Server 2012 R2
+- Windows Server 2016
+
+%>
+
+kernel <%= @host.operatingsystem.medium_uri(@host) %>../boot/wimboot gui
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/fonts/segmono_boot.ttf  segmono_boot.ttf
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/fonts/segoe_slboot.ttf  segoe_slboot.ttf
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/fonts/segoen_slboot.ttf segoen_slboot.ttf
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/fonts/wgl4_boot.ttf     wgl4_boot.ttf
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/bootmgr              bootmgr.exe
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/BCD         BCD
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot/boot.sdi    boot.sdi
+initrd <%= @host.operatingsystem.medium_uri(@host) %>../boot/boot.wim boot.wim
+imgstat
+boot

@@ -1,0 +1,36 @@
+<%#
+kind: ptable
+name: Windows Whole Disk
+oses:
+- Windows
+%>
+
+# P1 GPT "(e3c9e316-0b5c-4db8-817d-f92df00215ae)"
+# P2 GPT "(c12a7328-f81f-11d2-ba4b-00a0c93ec93b)"
+<%#
+$disk = Get-Disk 0
+$disk | Clear-Disk -RemoveData -Confirm:$false
+$disk | Initialize-Disk -PartitionStyle MBR
+$disk | New-Partition -Size 100mb -IsActive | Format-Volume -Confirm:$false
+$disk | New-Partition -UseMaximumSize -DriveLetter C | Format-Volume -Confirm:$false
+%>
+
+$DPFILE="x:\dp.txt"
+
+New-Item -ItemType file -Path $DPFILE
+
+Add-Content $DPFILE "select disk 0"
+Add-Content $DPFILE "`nclean"
+Add-Content $DPFILE "`ncreate partition primary size=100"
+Add-Content $DPFILE "`nselect partition 1"
+Add-Content $DPFILE "`nactive"
+Add-Content $DPFILE "`nformat quick fs=ntfs"
+Add-Content $DPFILE "`ncreate partition primary"
+Add-Content $DPFILE "`nselect partition 2"
+Add-Content $DPFILE "`nformat quick fs=ntfs label='System'"
+Add-Content $DPFILE "`nassign letter='C'"
+Add-Content $DPFILE "`nexit"
+
+diskpart /s $DPFILE
+
+Remove-Item $DPFILE

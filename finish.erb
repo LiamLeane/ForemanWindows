@@ -1,0 +1,145 @@
+<%#
+kind: finish
+name: Windows Configure
+oses:
+- Windows Server 2012
+- Windows Server 2012 R2
+- Windows Server 2016
+
+This template accepts the following parameters:
+- ntp-server: string (default="0.pool.ntp.org")
+- choco-repo: string (default="https://chocolatey.org/api/v2/")
+%>
+
+function GetRandomString([int]$Length)
+{    
+    $set    = "abcdefghijklmnopqrstuvwxyz0123456789".ToCharArray()
+    $result = ""
+	for ($x = 0; $x -lt $Length; $x++) {
+	    $result += $set | Get-Random
+	}
+	return $result
+}
+
+$ErrorActionPreference = "Stop"
+
+$rootPath = "c:\Foreman"
+$logPath = Join-Path $rootPath "Configure.log"
+
+Import-Module (Join-Path $rootPath "BuildFunctions.ps1")
+
+Start-Transcript $logPath | Out-Null
+
+Write-Host ("ConfigureWindows.ps1 started at " + (Get-Date))
+
+#1. Configure interfaces
+
+Write-Host "Configuring interfaces"
+$knownMacs = @{}
+
+<% @host.interfaces.managed.each do |interface| %>
+    <% if !interface.ip.empty? && interface.subnet != nil %>
+        $knownMacs.Add("<%=interface.mac%>".ToLower(), "<%=interface.identifier%>")
+        <% if @host.subnet.dhcp %>
+            Write-Host "Subnet for interface <%=interface.mac %> to to DHCP, ignoring"
+        <% else %>
+            Write-Host ("Configuring networking for interface <%=interface.mac %>")
+        	$ip = "<%=interface.ip%>"
+    		$mac = "<%=interface.mac%>"
+    		$cidr = "<%=interface.subnet.cidr%>"
+    		$gateway = "<%=interface.subnet.gateway%>"
+    		$domain = "<%=interface.domain%>"
+    		$dns = @("<%= interface.subnet.dns_primary %>"
+    			<% if interface.subnet.dns_secondary %>
+    		        ,"<%= interface.subnet.dns_secondary %>"
+    		    <% end%>)
+    		$interface = Get-NetAdapter | ? {$_.MacAddress.ToLower().Replace("-",":") -eq $mac.ToLower()} | Select -First 1
+        	
+    		if ($interface -ne $null)
+    		{			
+        	    Write-Host ("Configuring interface $mac for address $ip")
+                if (![string]::IsNullOrEmpty($domain))
+                {
+    			    Set-DnsClient -InterfaceAlias $interface.Name -ConnectionSpecificSuffix $domain
+                }
+                if ([string]::IsNullOrEmpty($gateway))
+                {
+                    New-NetIPAddress -InterfaceAlias $interface.Name -AddressFamily IPv4 -IPAddress $ip -PrefixLength $cidr
+                }
+                else
+                {
+                    New-NetIPAddress -InterfaceAlias $interface.Name -AddressFamily IPv4 -IPAddress $ip -PrefixLength $cidr -DefaultGateway $gateway
+                }
+                
+                if (![string]::IsNullOrEmpty($dns))
+                {
+    			    Set-DnsClientServerAddress -InterfaceAlias $interface.Name -ServerAddresses $dns
+                }
+                                
+                #Update interface status
+                Sleep 10
+                Get-NetIPAddress | where { $_.IPAddress -eq $ip }
+    		}
+    	<% end %>
+	<% end%>
+<% end %>
+
+foreach($adapter in Get-NetAdapter)
+{
+	if ($knownMacs.ContainsKey($adapter.MacAddress.ToLower().Replace("-",":")))
+	{
+        $newidentifier = $knownMacs.Get_Item($adapter.MacAddress.ToLower().Replace("-",":"))
+        
+        if ([string]::IsNullOrEmpty($newidentifier))
+        {
+            $newidentifier = (GetRandomString 8)
+        }
+		Rename-NetAdapter -Name $adapter.Name -NewName $newidentifier
+	}
+	else
+	{
+        Disable-NetAdapter -Name $adapter.Name -Confirm:$false
+		Rename-NetAdapter -Name $adapter.Name -NewName ("NOID_" + (GetRandomString 8))
+	}
+}
+
+#2. Wait for network to start
+BlockForNetwork
+
+#3. Force time sync
+Write-Host "Forcing time sync"
+w32tm /register
+Set-Service -Name w32time -StartupType Automatic
+net start w32time
+w32tm /config /syncfromflags:manual /manualpeerlist:"<%= @host.params['ntp-server'] || '0.pool.ntp.org' %>" /reliable:yes /update
+w32tm /resync /rediscover
+net stop w32time
+net start w32time
+
+#4. Install puppet
+Write-Host "Installing choclatey"
+iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
+
+Write-Host "Setting custom repo as package source"
+& "C:\ProgramData\chocolatey\choco.exe"
+(Get-Content C:\ProgramData\chocolatey\config\chocolatey.config).replace('https://chocolatey.org/api/v2/', '<%= @host.params['choco-repo'] || 'https://chocolatey.org/api/v2/' %>') | Set-Content C:\ProgramData\chocolatey\config\chocolatey.config
+
+Write-Host "Installing puppet agent"
+choco install puppet -installargs "PUPPET_AGENT_ACCOUNT_USER=administrator PUPPET_AGENT_ACCOUNT_PASSWORD=<%= @host.params['localAdminPassword'] %> PUPPET_MASTER_SERVER=<%= @host.puppetmaster %> PUPPET_AGENT_ENVIRONMENT=<%= @host.environment %> PUPPET_AGENT_STARTUP_MODE=automatic" -y
+
+Add-Content c:\ProgramData\PuppetLabs\puppet\etc\puppet.conf "`nruninterval=1800"
+Write-Host "Configuring puppet service"
+
+net stop puppet
+net start puppet
+
+#5 Configure WinRM
+Set-ExecutionPolicy Unrestricted -force
+winrm quickconfig -quiet
+winrm set winrm/config/service/auth '@{Basic="true"}'
+winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+
+Write-Host ("ConfigureWindows.ps1 finished at " + (Get-Date))
+
+Stop-Transcript
+sleep 30
