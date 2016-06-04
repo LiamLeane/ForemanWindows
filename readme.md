@@ -28,14 +28,13 @@ Repository layout should look something like this;
 * Windows
     * 6.2
     * 6.3
-    * 10
+    * 10.0
     * boot
         * boot
-        * sources
 
-The version specific folders should contain the install.wim for their respective release. boot/sources contains the formanized boot.wim. Version numbers should be used rather then release names due to how puppet will report the host to Foreman when facter runs.
+The version specific folders should contain the install.wim for their respective release,, boot.wim goes in the boot folder. Version numbers should be used rather then release names due to how puppet will report the host to Foreman when facter runs.
 
-You will need a Samba/Windows share for the install script to access the image. This must have the same path as your http source (EG if the path to the 6.2 install.wim is http://server/Windows/6.2/install.wim then it must also be accessable using \\server\Windows\6.2\install.wim. Due to security changes in PE10 this share must have a username/password set on it with read access.
+You will need a Samba/Windows share for the install script to access the image. When Windows is installed the http path set on OS media will have the HTTP path appended to the deploymentShare parameter (EG if the path to the 6.2 install.wim is http://server/Windows/6.2/install.wim and deploymentShare is set to "\\server\sources" then the share path to Windows 6.2 would be \\server\sources\Windows\6.2\install.wim. Due to security changes in PE10 this share must have a username/password set on it with read access.
 
 ### boot folder
 
@@ -59,8 +58,12 @@ Create a new installation medium pointing to the share you created. Your URL sho
 
 The installer script expects two properties for the username/password for mounting the install share to be set;
 
+* choco-repo - **Optional** If set will change the choco repo to a new value (EG artifactory server)
+* deploymentShare - Path to the Windows install share 
 * windowsInstallUsername - Username of an account with access to the install share
 * windowsInstallPassword - Plaintext password of the account
+
+![image](https://cloud.githubusercontent.com/assets/490726/15801868/94bc9bae-2a70-11e6-8c7d-d216e9c5157e.png)
  
 ### Create OSes
 
@@ -79,6 +82,8 @@ In addition each OS should have two properties set;
 
 * windowsEdition - The name of the image to apply from the install.wim (see bellow)
 * windowsLicenseKey - Key to use to license Windows
+
+![image](https://cloud.githubusercontent.com/assets/490726/15801884/e89060c6-2a70-11e6-94a8-a6fba9bc72b2.png)
 
 #### Windows Editions
 
