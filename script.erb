@@ -1,0 +1,86 @@
+<%#
+kind: script
+name: Windows Install
+oses:
+- Windows Server 2012
+- Windows Server 2012 R2
+- Windows Server 2016
+
+This template accepts the following parameters:
+-windowsEdition: Windows 2012|2012R2 SERVER STANDARD|ENTERPRISE|DATACENTER|CORE
+-deploymentShare: Path to share containing Windows images
+-deploymentShareUser: Username to access share
+-deploymentSharePassword: Password to access share
+%>
+
+param
+(
+    $rootPath
+)
+
+$ErrorActionPreference = "Stop"
+
+$logPath = Join-Path $rootPath "InstallWindows.log"
+$driveLetter = "t:"
+$windowsInstallPath = "<%= @host.params['deploymentShare'] %>"
+$installWim = "install.wim"
+$localForemanPath = "c:\Foreman\"
+
+Import-Module (Join-Path $rootPath "BuildFunctions.ps1")
+
+Start-Transcript $logPath | Out-Null
+
+Write-Host ("InstallWindows.ps1 started at " + (Get-Date))
+
+#1. Configure disk layout
+Write-Host "Configuring disk"
+<%= @host.diskLayout %>
+
+#2. Mount install share
+Write-Host "Mounting install share ${windowsInstallPath} to ${driveLetter}"
+net use $driveLetter $windowsInstallPath /user:<%= @host.params['deploymentShareUser'] %> <%= @host.params['deploymentSharePassword'] %>
+#MountDrive $driveLetter $windowsInstallPath
+
+#3. Expanding WIM
+$installurl = "<%= @host.operatingsystem.medium_uri(@host) %>"
+$installWimPath = Join-Path (HttpPathToFSPath $driveLetter $installurl) $installWim
+$installimage = "<%= @host.params['windowsEdition'] %>"
+
+Write-Host ("Expanding image " + $installimage + " from WIM " + $installWimPath);
+Expand-WindowsImage -ImagePath $installWimPath -Name $installimage -ApplyPath C:\
+
+#4. Add boot sector
+Write-Host "Adding boot sector"
+bootsect /nt60 C:
+
+#5. Add windows to BCD path
+Write-Host "Adding BCD chain"
+C:\Windows\System32\bcdboot C:\Windows /l en-US 
+
+#6. Copy all Foreman files to new drive
+Write-Host "Copying installer scripts to the host"
+New-Item -Path $localForemanPath -ItemType directory | Out-Null
+Copy-Item "x:\Foreman\*" $localForemanPath | Out-Null
+
+New-Item -Path "c:\Windows\Panther" -ItemType directory -ErrorAction SilentlyContinue | Out-Null
+Copy-Item (Join-Path $localForemanPath "unattend.xml") "c:\Windows\Panther\unattend.xml"
+
+#7. Apply the unattend
+Write-Host "Applying unattend.xml"
+New-Item -Path "c:\DismTemp\" -ItemType directory | Out-Null
+Apply-WindowsUnattend -UnattendPath "c:\Windows\Panther\unattend.xml" -Path C:\ -ScratchDirectory "C:\DismTemp\"
+
+#8. Write SetupComplete to finish install next boot
+$setupComplete = "c:\Windows\Setup\Scripts\SetupComplete.cmd"
+New-Item ([System.IO.Path]::GetDirectoryName($setupComplete)) -ItemType Directory -ErrorAction SilentlyContinue
+New-Item $setupComplete -ItemType file -Value "powershell -ExecutionPolicy Unrestricted c:\Foreman\ConfigureWindows.ps1" 
+
+#9. Notify foreman build is complete
+Invoke-WebRequest "<%= foreman_url %>" -UseBasicParsing | Out-Null
+
+Write-Host ("InstallWindows.ps1 finished at " + (Get-Date))
+
+Stop-Transcript | Out-Null
+
+Copy-Item -Path (Join-Path $rootPath "InstallWindows.log") -Destination $localForemanPath | Out-Null
+Restart-Computer

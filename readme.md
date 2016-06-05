@@ -1,13 +1,13 @@
 # Provisioning Windows With Foreman (without WDS)
 
-These templates are consumed by a boot.wim created using [ForemanWimScripts](https://github.com/LiamLeane/ForemanWimScripts). The templates are aquired when needed rather then stored as part of the wim so changes to your provisioning templates are immediately reflected in the build.
+These templates are consumed by a boot.wim created using [ForemanWimScripts](https://github.com/LiamLeane/ForemanWimScripts). The templates are acquired when needed rather then stored as part of the wim so changes to your provisioning templates are immediately reflected in the build.
 
 Task list (it's easy to miss a step):
 
-* Build wim files
 * Create install repo directory structure
 * Create Samba/Windows share for repo
-* Aquire boot files from ADK & wimboot
+* Build wim files
+* Acquire boot files from ADK & wimboot
 * Add Windows Media & OSes to Foreman
 * Add Windows provisioning scripts to Foreman (or use [Foreman Templates](https://github.com/theforeman/foreman_templates) to directly synchronize this repo)
 * Fin
@@ -17,13 +17,13 @@ See [ForemanWimScripts](https://github.com/LiamLeane/ForemanWimScripts) for hand
 
 The boot.wim is based on PE10 (2016) but supports installing 2012 & 2012R2 images too. It should also work for client editions but this is untested.
 
-NB - The only WIM that needs modifying for this process to work is the boot.wim file, the others are highly reccomended (Drivers & Updates) but the process will also work with any RTM install.wim from a Windows ISO.
+NB - The only WIM that needs modifying for this process to work is the boot.wim file, the others are highly recommended (Drivers & Updates) but the process will also work with any RTM install.wim from a Windows ISO.
 
 ### Setting up an Install Repo
 
-As with [Foreman-ESXi](https://github.com/LiamLeane/Foreman-ESXi) we need a repo to host our install packages. While Windows does not (currently) work with HTTP sources the scripts transform the HTTP media path in to a UNC path for aquisition so its strongly reccomended to dump your WIM files on a web server so its easy to check your paths.
+As with [Foreman-ESXi](https://github.com/LiamLeane/Foreman-ESXi) we need a repo to host our install packages. While Windows does not (currently) work well with HTTP sources the scripts transform the HTTP media path in to a UNC path for acquisition so its strongly recommended to dump your WIM files on a web server so its easy to check your paths.
 
-Repository layout should look something like this;
+Repository layout should look like this;
 
 * Windows
     * 6.2
@@ -31,10 +31,13 @@ Repository layout should look something like this;
     * 10.0
     * boot
         * boot
+		
+![image](https://cloud.githubusercontent.com/assets/490726/15801956/e881c1ea-2a72-11e6-98c0-6712fa2d5701.png)
+
 
 The version specific folders should contain the install.wim for their respective release,, boot.wim goes in the boot folder. Version numbers should be used rather then release names due to how puppet will report the host to Foreman when facter runs.
 
-You will need a Samba/Windows share for the install script to access the image. When Windows is installed the http path set on OS media will have the HTTP path appended to the deploymentShare parameter (EG if the path to the 6.2 install.wim is http://server/Windows/6.2/install.wim and deploymentShare is set to "\\server\sources" then the share path to Windows 6.2 would be \\server\sources\Windows\6.2\install.wim. Due to security changes in PE10 this share must have a username/password set on it with read access.
+You will need a Samba/Windows share for the install script to access the image. When Windows is installed the HTTP path set on OS media will have the HTTP path appended to the deploymentShare parameter (EG if the path to the 6.2 install.wim is http://server/Windows/6.2/install.wim and deploymentShare is set to "\\server\sources" then the share path to Windows 6.2 would be \\server\sources\Windows\6.2\install.wim. Due to security changes in PE10 this share must have a username/password set on it with read access.
 
 ### boot folder
 
@@ -60,8 +63,9 @@ The installer script expects two properties for the username/password for mounti
 
 * choco-repo - **Optional** If set will change the choco repo to a new value (EG artifactory server)
 * deploymentShare - Path to the Windows install share 
-* windowsInstallUsername - Username of an account with access to the install share
-* windowsInstallPassword - Plaintext password of the account
+* deploymentShareUser - Username of an account with access to the install share
+* deploymentSharePassword - Plaintext password of the account
+* ntp-server - **Optional** If set will update the NTP service to use the specified NTP server, otherwise uses NTP pool
 
 ![image](https://cloud.githubusercontent.com/assets/490726/15801868/94bc9bae-2a70-11e6-8c7d-d216e9c5157e.png)
  
@@ -103,19 +107,19 @@ In addition each OS should have two properties set;
 
 ##### 2016
 
-* Windows Server 2016 Technical Preview 4 SERVERSTANDARDCORE
-* Windows Server 2016 Technical Preview 4 SERVERSTANDARD
-* Windows Server 2016 Technical Preview 4 SERVERDATACENTERCORE
-* Windows Server 2016 Technical Preview 4 SERVERDATACENTER
+* Windows Server 2016 Technical Preview 5 SERVERSTANDARDCORE
+* Windows Server 2016 Technical Preview 5 SERVERSTANDARD
+* Windows Server 2016 Technical Preview 5 SERVERDATACENTERCORE
+* Windows Server 2016 Technical Preview 5 SERVERDATACENTER
  
 ## Windows Finish Script
 
 While the unattend & install scripts are basic and simply give you a standard windows install the finish script includes some steps you may want to rework for your environment;
 
 * All static interfaces defined in Foreman (IE where the subnet is set to static) will have their address, netmask, gateway, DNS servers and DNS suffix set based on the subnet & domain details from Foreman.
-* NIC's found on the machine but not defined in Foreman will be disabled and renmaed with the prefix "NOID_" followed by a string of random chars
+* NIC's found on the machine but not defined in Foreman will be disabled and renamed with the prefix "NOID_" followed by a string of random chars
 * If ntp-server is set as a global parameter then time will be immediately synchronized with that, otherwise one of the NTP pool servers will be used instead.
-* chocolatey.org is installed for package management. If the global parameter windowsNuGetSource is set then this will replace the default (https://chocolatey.org/api/v2/).
-* The latest version of puppet agent is installed. It uses the Puppet interval global setting in minutes (default 30) for run interval, sets the service to automatic and starts it.
+* chocolatey.org is installed for package management. 
+* The latest version of puppet agent is installed. It sets 30 minutes for run interval, sets the service to automatic and starts it.
 * Powershell execution policy is set to unrestricted
 * WinRM is enabled supporting basic auth without encryption
