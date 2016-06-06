@@ -124,15 +124,13 @@ Write-Host "Setting custom repo as package source"
 & "C:\ProgramData\chocolatey\choco.exe"
 (Get-Content C:\ProgramData\chocolatey\config\chocolatey.config).replace('https://chocolatey.org/api/v2/', '<%= @host.params['choco-repo'] || 'https://chocolatey.org/api/v2/' %>') | Set-Content C:\ProgramData\chocolatey\config\chocolatey.config
 
-Write-Host "Installing puppet agent"
+Write-Host "Installing & Configuring puppet agent"
 $pass = ([System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String("<%= Base64.encode64(Encoding::Converter.new("UTF-8", "UTF-16LE",:undef => nil).convert(Base64.decode64(root_pass)+"AdministratorPassword")).delete!("\n").chomp %>"))).Replace("AdministratorPassword", "")
 choco install puppet -installargs "PUPPET_AGENT_ACCOUNT_USER=administrator PUPPET_AGENT_ACCOUNT_PASSWORD=${pass} PUPPET_MASTER_SERVER=<%= @host.puppetmaster %> PUPPET_AGENT_ENVIRONMENT=<%= @host.environment %> PUPPET_AGENT_STARTUP_MODE=automatic" -y
 
 Add-Content c:\ProgramData\PuppetLabs\puppet\etc\puppet.conf "`nruninterval=1800"
-Write-Host "Configuring puppet service"
 
-net stop puppet
-net start puppet
+Restart-Service puppet
 
 #5 Configure WinRM
 Set-ExecutionPolicy Unrestricted -force
@@ -143,4 +141,3 @@ winrm set winrm/config/service '@{AllowUnencrypted="true"}'
 Write-Host ("ConfigureWindows.ps1 finished at " + (Get-Date))
 
 Stop-Transcript
-sleep 30

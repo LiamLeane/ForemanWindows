@@ -1,6 +1,6 @@
 # Provisioning Windows With Foreman (without WDS)
 
-These templates are consumed by a boot.wim created using [ForemanWimScripts](https://github.com/LiamLeane/ForemanWimScripts). The templates are acquired when needed rather then stored as part of the wim so changes to your provisioning templates are immediately reflected in the build.
+These templates are consumed by a boot.wim created using [ForemanWimScripts](https://github.com/LiamLeane/ForemanWimScripts). The templates are acquired when needed rather than stored as part of the wim so changes to your provisioning templates are immediately reflected in the build.
 
 Task list (it's easy to miss a step):
 
@@ -21,7 +21,7 @@ NB - The only WIM that needs modifying for this process to work is the boot.wim 
 
 ### Setting up an Install Repo
 
-As with [Foreman-ESXi](https://github.com/LiamLeane/Foreman-ESXi) we need a repo to host our install packages. While Windows does not (currently) work well with HTTP sources the scripts transform the HTTP media path in to a UNC path for acquisition so its strongly recommended to dump your WIM files on a web server so its easy to check your paths.
+As with [Foreman-ESXi](https://github.com/LiamLeane/Foreman-ESXi) we need a repo to host our install packages. While Windows does not (currently) work well with HTTP sources the scripts transform the HTTP media path in to a UNC path for acquisition so its strongly recommended to dump your WIM files on a web server so it’s easy to check your paths.
 
 Repository layout should look like this;
 
@@ -35,7 +35,7 @@ Repository layout should look like this;
 ![image](https://cloud.githubusercontent.com/assets/490726/15801956/e881c1ea-2a72-11e6-98c0-6712fa2d5701.png)
 
 
-The version specific folders should contain the install.wim for their respective release,, boot.wim goes in the boot folder. Version numbers should be used rather then release names due to how puppet will report the host to Foreman when facter runs.
+The version specific folders should contain the install.wim for their respective release, boot.wim goes in the boot folder. Version numbers should be used rather than release names due to how puppet will report the host to Foreman when facter runs.
 
 You will need a Samba/Windows share for the install script to access the image. When Windows is installed the HTTP path set on OS media will have the HTTP path appended to the deploymentShare parameter (EG if the path to the 6.2 install.wim is http://server/Windows/6.2/install.wim and deploymentShare is set to "\\server\sources" then the share path to Windows 6.2 would be \\server\sources\Windows\6.2\install.wim. Due to security changes in PE10 this share must have a username/password set on it with read access.
 

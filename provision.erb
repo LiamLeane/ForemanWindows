@@ -7,7 +7,6 @@ oses:
 - Windows Server 2016
 
 This template accepts the following parameters:
-- localAdminPassword: AdminPassword123 # Password that will be used for local admin
 - windowsLicenseKey: ABCDE-ABCDE-ABCDE-ABCDE-ABCDE # Valid Windows license key
 - windowsLicenseOwner: Company, INC # Legal owner of the Windows license key
 %>
@@ -51,22 +50,7 @@ This template accepts the following parameters:
             <ShowWindowsLive>false</ShowWindowsLive>            
             <% if @host.params['windowsLicenseKey'] -%>
                 <ProductKey><%= @host.params['windowsLicenseKey'].to_s %></ProductKey>
-            <% end -%>            
-            <AutoLogon>
-                <Password>
-                    <Value><%= @host.params['localAdminPassword'] %></Value>
-                    <PlainText>true</PlainText>
-                </Password>
-                <Username>administrator</Username>
-                <Enabled>true</Enabled>
-            </AutoLogon>
-            <FirstLogonCommands>
-                <SynchronousCommand wcm:action="add">
-                  <Order>1</Order>
-                  <CommandLine>powershell.exe -noprofile -executionpolicy unrestricted c:\Foreman\ConfigureWindows.ps1</CommandLine>
-                  <Description>PSell</Description>
-                </SynchronousCommand>
-              </FirstLogonCommands>
+            <% end -%>  
         </component>
     </settings>
     <settings pass="specialize">
